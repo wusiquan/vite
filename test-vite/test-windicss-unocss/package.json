@@ -1,0 +1,20 @@
+{
+  "name": "test-windicss",
+  "private": true,
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "analysis": "windicss-analysis"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^4.0.0",
+    "unocss": "^0.50.4",
+    "vite-plugin-windicss": "^1.8.10",
+    "windicss": "^3.5.6",
+    "windicss-analysis": "^0.3.5"
+  },
+  "dependencies": {
+    "vue": "^3.2.47"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "test-sourcemap",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --force"
+  },
+  "devDependencies": {
+    "@ampproject/remapping": "^2.2.0",
+    "magic-string": "^0.30.0"
+  }
+}
