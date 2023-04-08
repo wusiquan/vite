@@ -1,0 +1,26 @@
+{
+  "name": "test-plugin1",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --force",
+    "build": "vite build"
+  },
+  "devDependencies": {
+    "@jridgewell/gen-mapping": "^0.3.2",
+    "@jridgewell/trace-mapping": "^0.3.17",
+    "@lingdong/psvg": "^0.0.2",
+    "rollup": "^3.18.0",
+    "slash": "^5.0.0",
+    "source-map": "^0.7.4",
+    "svgo": "^3.0.2",
+    "vite": "workspace:*"
+  },
+  "engines": {
+    "node": "^14.18.0 || >=16.0.0"
+  },
+  "dependencies": {
+    "vue": "^3.2.47"
+  }
+}

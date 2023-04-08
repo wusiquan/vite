@@ -1,0 +1,360 @@
+import path from 'node:path'
+import type { SFCBlock, SFCDescriptor } from 'vue/compiler-sfc'
+import type { PluginContext, TransformPluginContext } from 'rollup'
+import type { RawSourceMap } from 'source-map'
+import type { EncodedSourceMap as TraceEncodedSourceMap } from '@jridgewell/trace-mapping'
+import { TraceMap, eachMapping } from '@jridgewell/trace-mapping'
+import type { EncodedSourceMap as GenEncodedSourceMap } from '@jridgewell/gen-mapping'
+import { addMapping, fromMap, toEncodedMap } from '@jridgewell/gen-mapping'
+// import { normalizePath, transformWithEsbuild } from 'vite'
+import { createDescriptor } from './utils/descriptorCache'
+import { isUseInlineTemplate, resolveScript } from './script'
+import { transformTemplateInMain } from './template'
+import { EXPORT_HELPER_ID } from './helper'
+import type { ResolvedOptions } from '.'
+
+// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+export async function transformMain(
+  code: string,
+  filename: string,
+  options: ResolvedOptions,
+  pluginContext: TransformPluginContext,
+  ssr: boolean,
+  asCustomElement: boolean,
+) {
+  const { devServer } = options
+
+  const { descriptor, errors } = createDescriptor(filename, code, options)
+
+  if (errors.length) {
+    // ...
+  }
+
+  // feature information
+  const attachedProps: [string, string][] = []
+
+  // script
+  const { code: scriptCode, map: scriptMap } = await genScriptCode(
+    descriptor,
+    options,
+    pluginContext,
+    ssr,
+  )
+
+  // template
+  const hasTemplateImport =
+    descriptor.template && !isUseInlineTemplate(descriptor, !devServer)
+
+  let templateCode = ''
+  let templateMap: RawSourceMap | undefined = undefined
+  if (hasTemplateImport) {
+    ;({ code: templateCode, map: templateMap as any } = await genTemplateCode(
+      descriptor,
+      options,
+      pluginContext,
+      ssr,
+    ))
+  }
+
+  if (hasTemplateImport) {
+    attachedProps.push(
+      ssr ? ['ssrRender', '_sfc_ssrRender'] : ['render', '_sfc_render'],
+    )
+  } else {
+    // #2128
+    // User may empty the template but we didn't provide rerender function before
+    // if (
+    //   prevDescriptor &&
+    //   !isEqualBlock(descriptor.template, prevDescriptor.template)
+    // ) {
+    //   attachedProps.push([ssr ? 'ssrRender' : 'render', '() => {}'])
+    // }
+  }
+
+  // styles
+  const stylesCode = await genStyleCode(
+    descriptor,
+    pluginContext,
+    asCustomElement,
+    attachedProps,
+  )
+
+  const output: string[] = [
+    scriptCode,
+    templateCode,
+    stylesCode,
+    // customBlocksCode,
+  ]
+
+  let resolvedMap: RawSourceMap | undefined = undefined
+  if (options.sourceMap) {
+    if (scriptMap && templateMap) {
+      // if the template is inlined into the main module (indicated by the presence
+      // of templateMap), we need to concatenate the two source maps.
+
+      const gen = fromMap(
+        // version property of result.map is declared as string
+        // but actually it is `3`
+        scriptMap as Omit<RawSourceMap, 'version'> as TraceEncodedSourceMap,
+      )
+      const tracer = new TraceMap(
+        // same above
+        templateMap as Omit<RawSourceMap, 'version'> as TraceEncodedSourceMap,
+      )
+      const offset = (scriptCode.match(/\r?\n/g)?.length ?? 0) + 1
+      eachMapping(tracer, (m) => {
+        if (m.source == null) return
+        addMapping(gen, {
+          source: m.source,
+          original: { line: m.originalLine, column: m.originalColumn },
+          generated: {
+            line: m.generatedLine + offset,
+            column: m.generatedColumn,
+          },
+        })
+      })
+
+      // same above
+      resolvedMap = toEncodedMap(gen) as Omit<
+        GenEncodedSourceMap,
+        'version'
+      > as RawSourceMap
+      // if this is a template only update, we will be reusing a cached version
+      // of the main module compile result, which has outdated sourcesContent.
+      resolvedMap.sourcesContent = (templateMap as any).sourcesContent
+    } else {
+      // if one of `scriptMap` and `templateMap` is empty, use the other one
+      resolvedMap = scriptMap ?? templateMap
+    }
+  }
+
+  if (!attachedProps.length) {
+    output.push(`export default _sfc_main`)
+  } else {
+    output.push(
+      `import _export_sfc from '${EXPORT_HELPER_ID}'`,
+      `export default /*#__PURE__*/_export_sfc(_sfc_main, [${attachedProps
+        .map(([key, val]) => `['${key}',${val}]`)
+        .join(',')}])`,
+    )
+  }
+
+  const resolvedCode = output.join('\n')
+
+  return {
+    code: resolvedCode,
+    map: resolvedMap || {
+      mappings: '',
+    },
+    meta: {
+      vite: {
+        lang: descriptor.script?.lang || descriptor.scriptSetup?.lang || 'js',
+      },
+    },
+  }
+}
+
+async function genTemplateCode(
+  descriptor: SFCDescriptor,
+  options: ResolvedOptions,
+  pluginContext: PluginContext,
+  ssr: boolean,
+) {
+  const template = descriptor.template!
+  const hasScoped = descriptor.styles.some((style) => style.scoped)
+
+  // If the template is not using pre-processor AND is not using external src,
+  // compile and inline it directly in the main module. When served in vite this
+  // saves an extra request per SFC which can improve load performance.
+  if (!template.lang && !template.src) {
+    return transformTemplateInMain(
+      template.content,
+      descriptor,
+      options,
+      pluginContext,
+      ssr,
+    )
+  } else {
+    // if (template.src) {
+    //   await linkSrcToDescriptor(
+    //     template.src,
+    //     descriptor,
+    //     pluginContext,
+    //     hasScoped,
+    //   )
+    // }
+    const src = template.src || descriptor.filename
+    const srcQuery = template.src
+      ? hasScoped
+        ? `&src=${descriptor.id}`
+        : '&src=true'
+      : ''
+    const scopedQuery = hasScoped ? `&scoped=${descriptor.id}` : ``
+    const attrsQuery = attrsToQuery(template.attrs, 'js', true)
+    const query = `?vue&type=template${srcQuery}${scopedQuery}${attrsQuery}`
+    const request = JSON.stringify(src + query)
+    const renderFnName = ssr ? 'ssrRender' : 'render'
+    return {
+      code: `import { ${renderFnName} as _sfc_${renderFnName} } from ${request}`,
+      map: undefined,
+    }
+  }
+}
+
+async function genScriptCode(
+  descriptor: SFCDescriptor,
+  options: ResolvedOptions,
+  pluginContext: PluginContext,
+  ssr: boolean,
+): Promise<{
+  code: string
+  map: RawSourceMap | undefined
+}> {
+  let scriptCode = `const _sfc_main = {}`
+  let map: RawSourceMap | undefined
+
+  const script = resolveScript(descriptor, options, ssr)
+  if (script) {
+    // If the script is js/ts and has no external src, it can be directly placed
+    // in the main module.
+    if (
+      (!script.lang || (script.lang === 'ts' && options.devServer)) &&
+      !script.src
+    ) {
+      const userPlugins = options.script?.babelParserPlugins || []
+      const defaultPlugins =
+        script.lang === 'ts'
+          ? userPlugins.includes('decorators')
+            ? (['typescript'] as const)
+            : (['typescript', 'decorators-legacy'] as const)
+          : []
+      scriptCode = options.compiler.rewriteDefault(
+        script.content,
+        '_sfc_main',
+        [...defaultPlugins, ...userPlugins],
+      )
+      map = script.map as any
+    } else {
+      // if (script.src) {
+      //   await linkSrcToDescriptor(script.src, descriptor, pluginContext, false)
+      // }
+      const src = script.src || descriptor.filename
+      const langFallback = (script.src && path.extname(src).slice(1)) || 'js'
+      const attrsQuery = attrsToQuery(script.attrs, langFallback)
+      const srcQuery = script.src ? `&src=true` : ``
+      const query = `?vue&type=script${srcQuery}${attrsQuery}`
+      const request = JSON.stringify(src + query)
+      scriptCode =
+        `import _sfc_main from ${request}\n` + `export * from ${request}` // support named exports
+    }
+  }
+
+  return {
+    code: scriptCode,
+    map,
+  }
+}
+
+async function genStyleCode(
+  descriptor: SFCDescriptor,
+  pluginContext: PluginContext,
+  asCustomElement: boolean,
+  attachedProps: [string, string][],
+) {
+  let stylesCode = ``
+  let cssModulesMap: Record<string, string> | undefined
+  if (descriptor.styles.length) {
+    for (let i = 0; i < descriptor.styles.length; i++) {
+      const style = descriptor.styles[i]
+      // if (style.src) {
+      //   await linkSrcToDescriptor(
+      //     style.src,
+      //     descriptor,
+      //     pluginContext,
+      //     style.scoped,
+      //   )
+      // }
+      const src = style.src || descriptor.filename
+      // do not include module in default query, since we use it to indicate
+      // that the module needs to export the modules json
+      const attrsQuery = attrsToQuery(style.attrs, 'css')
+      const srcQuery = style.src
+        ? style.scoped
+          ? `&src=${descriptor.id}`
+          : '&src=true'
+        : ''
+      const directQuery = asCustomElement ? `&inline` : ``
+      const scopedQuery = style.scoped ? `&scoped=${descriptor.id}` : ``
+      const query = `?vue&type=style&index=${i}${srcQuery}${directQuery}${scopedQuery}`
+      const styleRequest = src + query + attrsQuery
+      if (style.module) {
+        if (asCustomElement) {
+          throw new Error(
+            `<style module> is not supported in custom elements mode.`,
+          )
+        }
+        // const [importCode, nameMap] = genCSSModulesCode(
+        //   i,
+        //   styleRequest,
+        //   style.module,
+        // )
+        // stylesCode += importCode
+        // Object.assign((cssModulesMap ||= {}), nameMap)
+      } else {
+        if (asCustomElement) {
+          stylesCode += `\nimport _style_${i} from ${JSON.stringify(
+            styleRequest,
+          )}`
+        } else {
+          stylesCode += `\nimport ${JSON.stringify(styleRequest)}`
+        }
+      }
+      // TODO SSR critical CSS collection
+    }
+    if (asCustomElement) {
+      attachedProps.push([
+        `styles`,
+        `[${descriptor.styles.map((_, i) => `_style_${i}`).join(',')}]`,
+      ])
+    }
+  }
+  if (cssModulesMap) {
+    const mappingCode =
+      Object.entries(cssModulesMap).reduce(
+        (code, [key, value]) => code + `"${key}":${value},\n`,
+        '{\n',
+      ) + '}'
+    stylesCode += `\nconst cssModules = ${mappingCode}`
+    attachedProps.push([`__cssModules`, `cssModules`])
+  }
+  return stylesCode
+}
+
+// these are built-in query parameters so should be ignored
+// if the user happen to add them as attrs
+const ignoreList = ['id', 'index', 'src', 'type', 'lang', 'module', 'scoped']
+
+function attrsToQuery(
+  attrs: SFCBlock['attrs'],
+  langFallback?: string,
+  forceLangFallback = false,
+): string {
+  let query = ``
+  for (const name in attrs) {
+    const value = attrs[name]
+    if (!ignoreList.includes(name)) {
+      query += `&${encodeURIComponent(name)}${
+        value ? `=${encodeURIComponent(value)}` : ``
+      }`
+    }
+  }
+  if (langFallback || attrs.lang) {
+    query +=
+      `lang` in attrs
+        ? forceLangFallback
+          ? `&lang.${langFallback}`
+          : `&lang.${attrs.lang}`
+        : `&lang.${langFallback}`
+  }
+  return query
+}
