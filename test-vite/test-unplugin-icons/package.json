@@ -1,0 +1,20 @@
+{
+  "name": "test-unplugin-icons",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "debug": "node --inspect-brk ../../packages/vite/bin/vite",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@iconify-json/mdi": "^1.1.50",
+    "@iconify/utils": "^2.1.5",
+    "@vitejs/plugin-vue": "^4.1.0",
+    "@vue/compiler-sfc": "^3.2.47",
+    "unplugin-icons": "^0.16.1",
+    "local-pkg": "^0.4.3"
+  }
+}
