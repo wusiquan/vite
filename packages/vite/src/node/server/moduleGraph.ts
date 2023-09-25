@@ -102,9 +102,11 @@ export class ModuleGraph {
     if (mod) {
       return mod
     }
-
+    console.log(3433, rawUrl)
     const [url] = await this._resolveUrl(rawUrl, ssr)
-    return this.urlToModuleMap.get(url)
+    const r = this.urlToModuleMap.get(url)
+    console.log(3434, url, this.urlToModuleMap)
+    return r
   }
 
   getModuleById(id: string): ModuleNode | undefined {

@@ -348,7 +348,6 @@ export function buildHtmlPlugin(config: ResolvedConfig): Plugin {
           if (!nodeIsElement(node)) {
             return
           }
-
           let shouldRemove = false
 
           // script tags

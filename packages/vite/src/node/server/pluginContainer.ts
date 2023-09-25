@@ -311,6 +311,7 @@ export async function createPluginContainer(
         skipSelf?: boolean
       },
     ) {
+      console.log('plugin context reolve', id)
       let skip: Set<Plugin> | undefined
       if (options?.skipSelf && this._activePlugin) {
         skip = new Set(this._resolveSkips)
@@ -638,6 +639,7 @@ export async function createPluginContainer(
     },
 
     async resolveId(rawId, importer = join(root, 'index.html'), options) {
+      console.log('pluginContainer.resolveId', rawId, importer)
       const skip = options?.skip
       const ssr = options?.ssr
       const scan = !!options?.scan
@@ -648,7 +650,11 @@ export async function createPluginContainer(
       const resolveStart = debugResolve ? performance.now() : 0
       let id: string | null = null
       const partial: Partial<PartialResolvedId> = {}
-      for (const plugin of getSortedPlugins('resolveId')) {
+      let r = getSortedPlugins('resolveId')
+      // if (rawId == '/src/main.ts') {
+      //   console.log(8989, r)
+      // }
+      for (const plugin of r) {
         if (closed && !ssr) throwClosedServerError()
         if (!plugin.resolveId) continue
         if (skip?.has(plugin)) continue
@@ -683,7 +689,6 @@ export async function createPluginContainer(
           plugin.name,
           prettifyUrl(id, root),
         )
-
         // resolveId() is hookFirst - first non-null result is returned.
         break
       }
@@ -700,7 +705,6 @@ export async function createPluginContainer(
           )
         }
       }
-
       if (id) {
         partial.id = isExternalUrl(id) ? id : normalizePath(id)
         return partial as PartialResolvedId

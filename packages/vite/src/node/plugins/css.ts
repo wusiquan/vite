@@ -245,6 +245,7 @@ export function cssPlugin(config: ResolvedConfig): Plugin {
     },
 
     buildStart() {
+      console.log('vite:css buildStart')
       // Ensure a new cache for every build (i.e. rebuilding in watch mode)
       moduleCache = new Map<string, Record<string, string>>()
       cssModulesCache.set(config, moduleCache)
@@ -300,6 +301,7 @@ export function cssPlugin(config: ResolvedConfig): Plugin {
         deps,
         map,
       } = await compileCSS(id, raw, config, urlReplacer)
+
       if (modules) {
         moduleCache.set(id, modules)
       }
@@ -531,6 +533,7 @@ export function cssPostPlugin(config: ResolvedConfig): Plugin {
       let chunkCSS = ''
       let isPureCssChunk = true
       const ids = Object.keys(chunk.modules)
+      console.log(333, ids)
       for (const id of ids) {
         if (styles.has(id)) {
           chunkCSS += styles.get(id)

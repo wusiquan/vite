@@ -349,7 +349,7 @@ function preTransformRequest(server: ViteDevServer, url: string, base: string) {
   if (!server.config.server.preTransformRequests) return
 
   url = unwrapId(stripBase(url, base))
-
+  console.log('preTransformRequest', url)
   // transform all url as non-ssr as html includes client-side assets only
   server.transformRequest(url).catch((e) => {
     if (

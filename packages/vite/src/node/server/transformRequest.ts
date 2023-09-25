@@ -74,6 +74,7 @@ export function transformRequest(
   const timestamp = Date.now()
 
   const pending = server._pendingRequests.get(cacheKey)
+  console.log('cacheKey', cacheKey, pending)
   if (pending) {
     return server.moduleGraph
       .getModuleByUrl(removeTimestampQuery(url), options.ssr)
@@ -126,9 +127,9 @@ async function doTransform(
   const { config, pluginContainer } = server
   const prettyUrl = debugCache ? prettifyUrl(url, config.root) : ''
   const ssr = !!options.ssr
-
+  console.log('doTransform1', url)
   const module = await server.moduleGraph.getModuleByUrl(url, ssr)
-
+  console.log('doTransform2', url, !!module)
   // check if we have a fresh cache
   const cached =
     module && (ssr ? module.ssrTransformResult : module.transformResult)
@@ -149,7 +150,7 @@ async function doTransform(
 
   // resolve
   const id = module?.id ?? resolved?.id ?? url
-
+  console.log('doTransform3', !!resolved, id)
   const result = loadAndTransform(
     id,
     url,
@@ -160,8 +161,9 @@ async function doTransform(
     resolved,
   )
 
-  getDepsOptimizer(config, ssr)?.delayDepsOptimizerUntil(id, () => result)
-
+  const r = getDepsOptimizer(config, ssr)
+  r?.delayDepsOptimizerUntil(id, () => result)
+  console.log('doTransform4', id)
   return result
 }
 
@@ -174,6 +176,7 @@ async function loadAndTransform(
   mod?: ModuleNode,
   resolved?: PartialResolvedId,
 ) {
+  console.log('loadAndTransform', id, url)
   const { config, pluginContainer, moduleGraph, watcher } = server
   const { root, logger } = config
   const prettyUrl =

@@ -353,6 +353,7 @@ export async function _createServer(
   const httpServer = middlewareMode
     ? null
     : await resolveHttpServer(serverConfig, middlewares, httpsOptions)
+  console.log('createWebSocketServer', serverConfig)
   const ws = createWebSocketServer(httpServer, config, httpsOptions)
 
   if (httpServer) {
@@ -365,10 +366,11 @@ export async function _createServer(
     resolvedWatchOptions,
   ) as FSWatcher
 
-  const moduleGraph: ModuleGraph = new ModuleGraph((url, ssr) =>
-    container.resolveId(url, undefined, { ssr }),
-  )
-
+  const moduleGraph: ModuleGraph = new ModuleGraph((url, ssr) => {
+    console.log('传入ModuleGraph构造函数的resolveId执行')
+    const r = container.resolveId(url, undefined, { ssr });
+    return r;
+  })
   const container = await createPluginContainer(config, moduleGraph, watcher)
   const closeHttpServer = createServerCloseFn(httpServer)
 
@@ -680,6 +682,7 @@ export async function _createServer(
     if (initingServer) return initingServer
 
     initingServer = (async function () {
+      console.log('initingServer...')
       await container.buildStart({})
       // start deps optimizer after all container plugins are ready
       if (isDepsOptimizerEnabled(config, false)) {

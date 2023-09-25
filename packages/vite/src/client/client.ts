@@ -30,7 +30,6 @@ const socketHost = `${__HMR_HOSTNAME__ || importMetaUrl.hostname}:${
 const directSocketHost = __HMR_DIRECT_TARGET__
 const base = __BASE__ || '/'
 const messageBuffer: string[] = []
-
 let socket: WebSocket
 try {
   let fallback: (() => void) | undefined

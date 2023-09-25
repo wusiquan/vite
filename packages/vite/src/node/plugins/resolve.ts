@@ -147,6 +147,7 @@ export function resolvePlugin(resolveOptions: InternalResolveOptions): Plugin {
     name: 'vite:resolve',
 
     async resolveId(id, importer, resolveOpts) {
+      console.log('vite:resolve resolveId', id)
       if (
         id[0] === '\0' ||
         id.startsWith('virtual:') ||
@@ -347,6 +348,7 @@ export function resolvePlugin(resolveOptions: InternalResolveOptions): Plugin {
             options.packageCache,
           ))
         ) {
+          console.log(121, id, res)
           return res
         }
 
@@ -904,7 +906,7 @@ export async function tryOptimizedResolve(
   await depsOptimizer.scanProcessing
 
   const metadata = depsOptimizer.metadata
-
+  
   const depInfo = optimizedDepInfoFromId(metadata, id)
   if (depInfo) {
     return depsOptimizer.getOptimizedDepId(depInfo)

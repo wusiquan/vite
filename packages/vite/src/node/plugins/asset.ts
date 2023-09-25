@@ -142,6 +142,7 @@ export function assetPlugin(config: ResolvedConfig): Plugin {
     name: 'vite:asset',
 
     buildStart() {
+      console.log('vite:asset buildStart')
       assetCache.set(config, new Map())
       generatedAssets.set(config, new Map())
     },
@@ -185,7 +186,6 @@ export function assetPlugin(config: ResolvedConfig): Plugin {
 
     renderChunk(code, chunk, opts) {
       const s = renderAssetUrlInJS(this, config, chunk, opts, code)
-
       if (s) {
         return {
           code: s.toString(),

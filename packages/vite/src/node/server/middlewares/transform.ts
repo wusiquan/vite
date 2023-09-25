@@ -53,6 +53,7 @@ export function transformMiddleware(
 
   // Keep the named function. The name is visible in debug logs via `DEBUG=connect:dispatcher ...`
   return async function viteTransformMiddleware(req, res, next) {
+    console.log('viteTransformMiddleware', req.url)
     if (req.method !== 'GET' || knownIgnoreList.has(req.url!)) {
       return next()
     }
@@ -171,6 +172,7 @@ export function transformMiddleware(
         isCSSRequest(url) ||
         isHTMLProxy(url)
       ) {
+        console.log('viteTransformMiddleware...', url)
         // strip ?import
         url = removeImportQuery(url)
         // Strip valid id prefix. This is prepended to resolved Ids that are
@@ -189,16 +191,18 @@ export function transformMiddleware(
 
         // check if we can return 304 early
         const ifNoneMatch = req.headers['if-none-match']
+        console.log('ifNoneMatch', ifNoneMatch)
         if (
           ifNoneMatch &&
           (await moduleGraph.getModuleByUrl(url, false))?.transformResult
             ?.etag === ifNoneMatch
         ) {
+          console.log('ifNoneMatch === etag')
           debugCache?.(`[304] ${prettifyUrl(url, root)}`)
           res.statusCode = 304
           return res.end()
         }
-
+        console.log('transformRequest', url)
         // resolve, load and transform using the plugin container
         const result = await transformRequest(url, server, {
           html: req.headers.accept?.includes('text/html'),

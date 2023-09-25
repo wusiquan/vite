@@ -311,7 +311,7 @@ export function importAnalysisPlugin(config: ResolvedConfig): Plugin {
             }
           }
         }
-
+        console.log('importAnalysis transform', url, importerFile)
         const resolved = await this.resolve(url, importerFile)
 
         if (!resolved) {
@@ -526,7 +526,7 @@ export function importAnalysisPlugin(config: ResolvedConfig): Plugin {
 
             // normalize
             const [url, resolvedId] = await normalizeUrl(specifier, start)
-
+            console.log('transform', url, resolvedId)
             if (
               !isDynamicImport &&
               specifier &&
