@@ -1,7 +1,7 @@
 import './style.css'
-import { sayHello } from './foo'
+import { sayFoo } from './foo'
 
-sayHello()
+sayFoo()
 
 const app = document.querySelector<HTMLDivElement>('#app')!
 
