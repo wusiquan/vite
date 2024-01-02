@@ -1,5 +1,5 @@
 import './hello.css'
 
-export function sayHello(): void {
-  console.log('hello1')
+export function sayFoo(): void {
+  console.log('foo')
 }
